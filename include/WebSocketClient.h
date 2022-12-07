@@ -9,7 +9,7 @@
 #include <functional>
 #include <optional>
 
-class WebSocketClient{
+class WebSocketClient {
 public:
     WebSocketClient();
 
@@ -29,17 +29,19 @@ public:
 
     void sendText(String txt);
 
+    void sendPong();
+
     typedef std::function<void(uint8_t *, size_t)> webSocketReceiveCB;
 
-    void onTextMessageReceived(webSocketReceiveCB cb){_webSockectReceiveText = cb;};
+    void onTextMessageReceived(webSocketReceiveCB cb) { _webSocketReceiveText = cb; };
 
-    void onBinaryMessageReceived(webSocketReceiveCB cb){_webSockectReceiveBinary = cb;};
+    void onPingMessageReceived(webSocketReceiveCB cb) { _webSocketReceivePing = cb; };
 
-    void onConnected(webSocketReceiveCB cb){_webSockectReceiveConnected = cb;};
+    void onConnected(webSocketReceiveCB cb) { _webSocketReceiveConnected = cb; };
 
-    void onDisconnected(webSocketReceiveCB cb){_webSockectReceiveDisconnected = cb;};
+    void onDisconnected(webSocketReceiveCB cb) { _webSocketReceiveDisconnected = cb; };
 
-    void onErrorReceived(webSocketReceiveCB cb){_webSockectReceiveError = cb;};
+    void onErrorReceived(webSocketReceiveCB cb) { _webSocketReceiveError = cb; };
 
 private:
     String _host = "0.0.0.0";
@@ -48,11 +50,11 @@ private:
 
     WebSocketsClient _client;
 
-    std::optional<webSocketReceiveCB> _webSockectReceiveText;
-    std::optional<webSocketReceiveCB> _webSockectReceiveBinary;
-    std::optional<webSocketReceiveCB> _webSockectReceiveConnected;
-    std::optional<webSocketReceiveCB> _webSockectReceiveDisconnected;
-    std::optional<webSocketReceiveCB> _webSockectReceiveError;
+    std::optional<webSocketReceiveCB> _webSocketReceiveText;
+    std::optional<webSocketReceiveCB> _webSocketReceivePing;
+    std::optional<webSocketReceiveCB> _webSocketReceiveConnected;
+    std::optional<webSocketReceiveCB> _webSocketReceiveDisconnected;
+    std::optional<webSocketReceiveCB> _webSocketReceiveError;
 };
 
 

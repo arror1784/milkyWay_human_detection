@@ -15,13 +15,13 @@ static const uint8_t send0153Address = SEN0153_ADDRESS_DEFAULT;
 static const int8_t sen0153RX = 16;
 static const int8_t sen0153TX = 17;
 
-static const String host = "192.168.0.195";
-static const int port = 6001;
-static const bool ssl = false;
+//static const String host = "192.168.0.195";
+//static const int port = 6001;
+//static const bool ssl = false;
 
-//static const String host = "kira-api.wimcorp.dev";
-//static const int port = 443;
-//static const bool ssl = true;
+static const String host = "kira-api.wimcorp.dev";
+static const int port = 443;
+static const bool ssl = true;
 
 //Consts
 const uint16_t maxdist = 450; //초음파센서 측정 최대거리(450cm 추천, 300cm 이상부터는 noise 영향 심해짐)
@@ -171,9 +171,6 @@ void setup() {
     Serial.begin(115200);
     EepromControl::getInstance().init();
 
-    EepromControl::getInstance().setSerial("Kira 11");
-    EepromControl::getInstance().setWifiPsk("Wim", "Wim12345!");
-
     WiFiClass::mode(WIFI_MODE_STA);
 
     Serial.println("SERIAL : " + EepromControl::getInstance().getSerial());
@@ -213,15 +210,9 @@ void setup() {
             min_target_dist = 0;
             max_target_dist = doc["sens"];
         }
-        else if (doc["event"] == "Ping") {
-            DynamicJsonDocument json(512);
-            json["event"] = "Pong";
-
-            String strJson;
-            serializeJson(json, strJson);
-
-            wsClient.sendText(strJson);
-        }
+    });
+    wsClient.onPingMessageReceived([&](uint8_t *payload, size_t length) {
+        wsClient.sendPong();
     });
     wsClient.onErrorReceived([&](uint8_t *payload, size_t length) {
         Serial.println(String(payload, length));

@@ -39,7 +39,6 @@ uint32_t tick = 0;
 
 const int threshold_count = 5; // 커질수록 해당위치에 오래있어야 trigger on
 int detaction_count = 0; // 커질수록 해당위치에 오래있어야 trigger on
-bool isDetected = false;
 bool isConnectToWifiWithAPI = false;
 
 WebSocketClient wsClient;
@@ -250,6 +249,9 @@ void setup() {
     ult.begin();
 }
 
+int delayTime = 1000;
+int lastTick = 0;
+const int a = 20;
 void loop() {
     webServer.handleClient();
     wsClient.loop();
@@ -262,24 +264,26 @@ void loop() {
             Serial.println("raw    : " + String(distanceRaw));
 
             if (distanceKalman > min_target_dist && distanceKalman < max_target_dist) {
-                detaction_count++;
+                if(detaction_count >=  threshold_count && detaction_count > 0)
+                    detaction_count++;  
             }
             else {
-                detaction_count = 0;
+                if(detaction_count <=  threshold_count && detaction_count > 0)
+                    detaction_count--;
             }
 
-            if (detaction_count > threshold_count) {
-                if (!isDetected) {
-                    isDetected = true;
-                    sendIsDetected(isDetected);
+            TickType_t xLastWakeTime = xTaskGetTickCount();
+            if(lastTick + pdMS_TO_TICKS(delayTime) < xLastWakeTime){
+                lastTick = xLastWakeTime;
+                if (detaction_count > threshold_count) {
+                    sendIsDetected(true);
+                }
+                else {
+                    sendIsDetected(false);
                 }
             }
-            else {
-                if (isDetected) {
-                    isDetected = false;
-                    sendIsDetected(isDetected);
-                }
-            }
+
+
         }
     }
     else {
@@ -292,6 +296,6 @@ void loop() {
             WifiModule::getInstance().start();
         }
     }
-
     delay(50);
+
 }

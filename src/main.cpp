@@ -19,9 +19,15 @@ static const int8_t sen0153TX = 17;
 //static const int port = 6001;
 //static const bool ssl = false;
 
-static const String host = "kira-api.wimcorp.dev";
-static const int port = 443;
-static const bool ssl = true;
+static const String host = "13.125.102.123";
+static const int port = 11002;
+static const bool ssl = false;
+
+String authenticationToken;
+
+//static const String host = "kira-api.wimcorp.dev";
+//static const int port = 443;
+//static const bool ssl = true;
 
 //Consts
 const uint16_t maxdist = 450; //초음파센서 측정 최대거리(450cm 추천, 300cm 이상부터는 noise 영향 심해짐)
@@ -29,6 +35,7 @@ const uint16_t mindist = 30; //초음파센서 측정 최소거리(30cm 추천, 
 
 uint16_t max_target_dist = 150;
 uint16_t min_target_dist = 100;
+uint32_t tick = 0;
 
 const int threshold_count = 5; // 커질수록 해당위치에 오래있어야 trigger on
 int detaction_count = 0; // 커질수록 해당위치에 오래있어야 trigger on
@@ -75,11 +82,12 @@ void receiveWifi() {
     DynamicJsonDocument doc(plainBody.length() * 2);
     deserializeJson(doc, plainBody);
 
-    if (doc.containsKey("ssid") && doc.containsKey("password")) {
+    if (doc.containsKey("ssid") && doc.containsKey("password"), doc.containsKey("token")) {
         String strPayload;
 
         serializeJson(doc, strPayload);
 
+        authenticationToken = String(doc["token"]);
         EepromControl::getInstance().setWifiPsk(doc["ssid"], doc["password"]);
 
         Serial.println(EepromControl::getInstance().getWifiSsid());
@@ -95,6 +103,7 @@ void receiveWifi() {
         }
 
         if (!status) {
+            EepromControl::getInstance().setWifiPsk("", "");
             isConnectToWifiWithAPI = false;
 
             webServer.send(400, "text/plain", "network connect fail");
@@ -103,10 +112,10 @@ void receiveWifi() {
 
         isConnectToWifiWithAPI = false;
         webServer.send(200);
-
         delay(5000);
 
         WifiModule::getInstance().stop();
+
         wsClient.connect();
     }
     else {
@@ -192,6 +201,7 @@ void setup() {
         json["name"] = EepromControl::getInstance().getSerial();
         Serial.println(String(json["name"]));
         json["type"] = "HumanDetection";
+        json["token"] = authenticationToken;
 
         String strJson;
         serializeJson(json, strJson);
@@ -205,6 +215,19 @@ void setup() {
         DynamicJsonDocument doc(length * 2);
         deserializeJson(doc, payload, length);
 
+        if (doc.containsKey("authenticationToken")) {
+            String token = String(doc["authenticationToken"]);
+
+            if (token.isEmpty()) {
+                wsClient.disconnect();
+                EepromControl::getInstance().setWifiPsk("", "");
+                WifiModule::getInstance().start();
+
+                return;
+            }
+
+            authenticationToken = token;
+        }
         if (doc.containsKey("sens")) {
             Serial.println("doc[\"sens\"]" + String(doc["sens"]));
             min_target_dist = 0;
@@ -257,7 +280,6 @@ void loop() {
                     sendIsDetected(isDetected);
                 }
             }
-
         }
     }
     else {

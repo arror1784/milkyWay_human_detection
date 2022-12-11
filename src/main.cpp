@@ -7,13 +7,11 @@
 #include <ArduinoJson.h>
 
 #include "WifiModule.h"
-#include "SEN0153.h"
+#include "LV_EZ1.h"
 #include "WebSocketClient.h"
 #include "EepromControl.h"
 
-static const uint8_t send0153Address = SEN0153_ADDRESS_DEFAULT;
-static const int8_t sen0153RX = 16;
-static const int8_t sen0153TX = 17;
+static const int8_t lvEz1Pin = 16;
 
 //static const String host = "192.168.0.195";
 //static const int port = 6001;
@@ -31,7 +29,7 @@ String authenticationToken;
 
 //Consts
 const uint16_t maxdist = 450; //초음파센서 측정 최대거리(450cm 추천, 300cm 이상부터는 noise 영향 심해짐)
-const uint16_t mindist = 30; //초음파센서 측정 최소거리(30cm 추천, 너무 가까운 거리에서는 노이즈 발생
+const uint16_t mindist = 0; //초음파센서 측정 최소거리(30cm 추천, 너무 가까운 거리에서는 노이즈 발생
 
 uint16_t max_target_dist = 150;
 uint16_t min_target_dist = 100;
@@ -43,7 +41,7 @@ bool isConnectToWifiWithAPI = false;
 
 WebSocketClient wsClient;
 WebServer webServer(80);
-SEN0153 ult(sen0153RX, sen0153TX, SEN0153_BAUD_RATE_DEFAULT);
+LV_EZ1 ult(lvEz1Pin, LV_EZ1_MODE_PULSE);
 
 bool connectWifi() {
     auto ssid = EepromControl::getInstance().getWifiSsid();
@@ -246,7 +244,7 @@ void setup() {
 
     webServer.begin();
 
-    ult.begin();
+    ult.activate();
 }
 
 int delayTime = 1000;
@@ -257,7 +255,7 @@ void loop() {
     wsClient.loop();
 
     if (WifiModule::getInstance().isConnectedST() && !isConnectToWifiWithAPI) {
-        auto distanceRaw = ult.readDistance(send0153Address);
+        auto distanceRaw = ult.read();
         if (distanceRaw > mindist && distanceRaw < maxdist) {
             auto distanceKalman = kalman(distanceRaw);
             Serial.println("kalman : " + String(distanceKalman));

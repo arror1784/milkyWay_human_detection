@@ -11,7 +11,7 @@
 #include "WebSocketClient.h"
 #include "EepromControl.h"
 
-static const int8_t lvEz1Pin = 16;
+static const int8_t lvEz1Pin = 34;
 
 //static const String host = "192.168.0.195";
 //static const int port = 6001;
@@ -37,7 +37,10 @@ uint32_t tick = 0;
 
 const int threshold_count = 5; // 커질수록 해당위치에 오래있어야 trigger on
 int detaction_count = 0; // 커질수록 해당위치에 오래있어야 trigger on
+
 bool isConnectToWifiWithAPI = false;
+
+int wifiConnectCount = 0;
 
 WebSocketClient wsClient;
 WebServer webServer(80);
@@ -93,7 +96,7 @@ void receiveWifi() {
         bool status = false;
 
         for (int i = 0; i < 3; i++) {
-            if (connectWifi() == true) {
+            if (connectWifi()) {
                 status = true;
                 break;
             }
@@ -114,6 +117,8 @@ void receiveWifi() {
         WifiModule::getInstance().stop();
 
         wsClient.connect();
+
+        wifiConnectCount = 0;
     }
     else {
         isConnectToWifiWithAPI = false;
@@ -235,7 +240,6 @@ void setup() {
         wsClient.sendPong();
     });
     wsClient.onErrorReceived([&](uint8_t *payload, size_t length) {
-        Serial.println(String(payload, length));
         Serial.println("websocket errorReceived");
     });
 
@@ -250,6 +254,7 @@ void setup() {
 int delayTime = 1000;
 int lastTick = 0;
 const int a = 20;
+
 void loop() {
     webServer.handleClient();
     wsClient.loop();
@@ -285,13 +290,20 @@ void loop() {
         }
     }
     else {
-        if (connectWifi()) {
-            delay(1000);
-            WifiModule::getInstance().stop();
-            wsClient.connect();
-        }
-        else {
-            WifiModule::getInstance().start();
+        if (wifiConnectCount < 5) {
+            if (connectWifi()) {
+                delay(1000);
+                WifiModule::getInstance().stop();
+                wsClient.connect();
+            }
+            else {
+                wifiConnectCount += 1;
+                Serial.println("wifiConnectCount : " + String(wifiConnectCount));
+
+                if (wifiConnectCount == 5) {
+                    WifiModule::getInstance().start();
+                }
+            }
         }
     }
     delay(50);

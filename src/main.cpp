@@ -31,13 +31,14 @@ String authenticationToken;
 const uint16_t maxdist = 450; //초음파센서 측정 최대거리(450cm 추천, 300cm 이상부터는 noise 영향 심해짐)
 const uint16_t mindist = 0; //초음파센서 측정 최소거리(30cm 추천, 너무 가까운 거리에서는 노이즈 발생
 
-uint16_t max_target_dist = 150;
-uint16_t min_target_dist = 100;
+uint16_t max_target_dist = 0;
+uint16_t min_target_dist = 0;
 uint32_t tick = 0;
 
 const int threshold_count = 5; // 커질수록 해당위치에 오래있어야 trigger on
-int detaction_count = 0; // 커질수록 해당위치에 오래있어야 trigger on
+int detection_count = 0; // 커질수록 해당위치에 오래있어야 trigger on
 
+bool isDetected = false;
 bool isConnectToWifiWithAPI = false;
 
 int wifiConnectCount = 0;
@@ -174,7 +175,6 @@ void sendIsDetected(bool detected) {
 
     String strJson;
     serializeJson(json, strJson);
-    Serial.println(strJson);
     wsClient.sendText(strJson);
 }
 
@@ -260,32 +260,36 @@ void loop() {
     wsClient.loop();
 
     if (WifiModule::getInstance().isConnectedST() && !isConnectToWifiWithAPI) {
-        auto distanceRaw = ult.read();
+        if (max_target_dist == 0 && min_target_dist == 0) return;
+        auto distanceRaw = ult.read() * 2.54; // original value unit = inch
         if (distanceRaw > mindist && distanceRaw < maxdist) {
             auto distanceKalman = kalman(distanceRaw);
-            Serial.println("kalman : " + String(distanceKalman));
-            Serial.println("raw    : " + String(distanceRaw));
 
             if (distanceKalman > min_target_dist && distanceKalman < max_target_dist) {
-                if(detaction_count >=  threshold_count && detaction_count > 0)
-                    detaction_count++;  
+                if (detection_count < threshold_count)
+                    detection_count += 1;
             }
             else {
-                if(detaction_count <=  threshold_count && detaction_count > 0)
-                    detaction_count--;
+                if (detection_count <= threshold_count && detection_count > 0)
+                    detection_count -= 1;
+            }
+
+            if (detection_count == threshold_count) {
+                isDetected = true;
+            }
+            else if (detection_count == 0) {
+                isDetected = false;
             }
 
             TickType_t xLastWakeTime = xTaskGetTickCount();
-            if(lastTick + pdMS_TO_TICKS(delayTime) < xLastWakeTime){
+            if (lastTick + pdMS_TO_TICKS(delayTime) < xLastWakeTime) {
                 lastTick = xLastWakeTime;
-                if (detaction_count > threshold_count) {
-                    sendIsDetected(true);
-                }
-                else {
-                    sendIsDetected(false);
-                }
+                sendIsDetected(isDetected);
             }
 
+            Serial.println("kalman          : " + String(distanceKalman));
+            Serial.println("raw             : " + String(distanceRaw));
+            Serial.println("detection_count : " + String(detection_count));
 
         }
     }

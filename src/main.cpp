@@ -181,6 +181,8 @@ void sendIsDetected(bool detected) {
 void setup() {
     Serial.begin(115200);
     EepromControl::getInstance().init();
+    EepromControl::getInstance().setWifiPsk("", "");
+    EepromControl::getInstance().setSerial("Kira_Detector_00001");
 
     WiFiClass::mode(WIFI_MODE_STA);
 
@@ -235,6 +237,7 @@ void setup() {
             min_target_dist = 0;
             max_target_dist = doc["sens"];
         }
+        // TODO : 서버에서 SendDeviceConfig 전송에 대한 핸들링 추가
     });
     wsClient.onPingMessageReceived([&](uint8_t *payload, size_t length) {
         wsClient.sendPong();
@@ -253,7 +256,6 @@ void setup() {
 
 int delayTime = 1000;
 int lastTick = 0;
-const int a = 20;
 
 void loop() {
     webServer.handleClient();
@@ -266,20 +268,14 @@ void loop() {
             auto distanceKalman = kalman(distanceRaw);
 
             if (distanceKalman > min_target_dist && distanceKalman < max_target_dist) {
-                if (detection_count < threshold_count)
-                    detection_count += 1;
+                if (detection_count < threshold_count) detection_count += 1;
             }
             else {
-                if (detection_count <= threshold_count && detection_count > 0)
-                    detection_count -= 1;
+                if (detection_count <= threshold_count && detection_count > 0) detection_count -= 1;
             }
 
-            if (detection_count == threshold_count) {
-                isDetected = true;
-            }
-            else if (detection_count == 0) {
-                isDetected = false;
-            }
+            if (detection_count == threshold_count) isDetected = true;
+            else if (detection_count == 0)          isDetected = false;
 
             TickType_t xLastWakeTime = xTaskGetTickCount();
             if (lastTick + pdMS_TO_TICKS(delayTime) < xLastWakeTime) {

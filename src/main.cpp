@@ -13,19 +13,19 @@
 
 static const int8_t lvEz1Pin = 34;
 
-//static const String host = "192.168.0.195";
-//static const int port = 6001;
-//static const bool ssl = false;
-
-static const String host = "13.125.102.123";
-static const int port = 11002;
+static const String host = "192.168.0.195";
+static const int port = 6001;
 static const bool ssl = false;
 
-String authenticationToken;
+//static const String host = "13.125.102.123";
+//static const int port = 11002;
+//static const bool ssl = false;
 
 //static const String host = "kira-api.wimcorp.dev";
 //static const int port = 443;
 //static const bool ssl = true;
+
+String authenticationToken;
 
 //Consts
 const uint16_t maxdist = 450; //초음파센서 측정 최대거리(450cm 추천, 300cm 이상부터는 noise 영향 심해짐)
@@ -33,7 +33,7 @@ const uint16_t mindist = 0; //초음파센서 측정 최소거리(30cm 추천, �
 
 uint16_t max_target_dist = 0;
 uint16_t min_target_dist = 0;
-uint32_t tick = 0;
+//uint32_t tick = 0;
 
 const int threshold_count = 5; // 커질수록 해당위치에 오래있어야 trigger on
 int detection_count = 0; // 커질수록 해당위치에 오래있어야 trigger on
@@ -178,10 +178,16 @@ void sendIsDetected(bool detected) {
     wsClient.sendText(strJson);
 }
 
+void processConfig(const JsonObject &data) {
+    min_target_dist = 0;
+    max_target_dist = data["sens"];
+    isDetected = data["humanDetected"];
+}
+
 void setup() {
     Serial.begin(115200);
     EepromControl::getInstance().init();
-    EepromControl::getInstance().setWifiPsk("", "");
+    EepromControl::getInstance().setWifiPsk("Wim", "Wim12345!");
     EepromControl::getInstance().setSerial("Kira_Detector_00001");
 
     WiFiClass::mode(WIFI_MODE_STA);
@@ -219,6 +225,10 @@ void setup() {
         DynamicJsonDocument doc(length * 2);
         deserializeJson(doc, payload, length);
 
+        String strJson;
+        serializeJson(doc, strJson);
+        Serial.println("onTextMessageReceived : " + strJson);
+
         if (doc.containsKey("authenticationToken")) {
             String token = String(doc["authenticationToken"]);
 
@@ -232,12 +242,9 @@ void setup() {
 
             authenticationToken = token;
         }
-        if (doc.containsKey("sens")) {
-            Serial.println("doc[\"sens\"]" + String(doc["sens"]));
-            min_target_dist = 0;
-            max_target_dist = doc["sens"];
+        else if (doc["event"] == "SendHumanDetectionConfig") {
+            processConfig(doc["data"]);
         }
-        // TODO : 서버에서 SendDeviceConfig 전송에 대한 핸들링 추가
     });
     wsClient.onPingMessageReceived([&](uint8_t *payload, size_t length) {
         wsClient.sendPong();
@@ -254,8 +261,8 @@ void setup() {
     ult.activate();
 }
 
-int delayTime = 1000;
-int lastTick = 0;
+//int delayTime = 1000;
+//int lastTick = 0;
 
 void loop() {
     webServer.handleClient();
@@ -274,19 +281,24 @@ void loop() {
                 if (detection_count <= threshold_count && detection_count > 0) detection_count -= 1;
             }
 
-            if (detection_count == threshold_count) isDetected = true;
-            else if (detection_count == 0)          isDetected = false;
-
-            TickType_t xLastWakeTime = xTaskGetTickCount();
-            if (lastTick + pdMS_TO_TICKS(delayTime) < xLastWakeTime) {
-                lastTick = xLastWakeTime;
+            if (!isDetected && detection_count == threshold_count) {
+                isDetected = true;
                 sendIsDetected(isDetected);
             }
+            else if (isDetected && detection_count == 0) {
+                isDetected = false;
+                sendIsDetected(isDetected);
+            }
+
+//            TickType_t xLastWakeTime = xTaskGetTickCount();
+//            if (lastTick + pdMS_TO_TICKS(delayTime) < xLastWakeTime) {
+//                lastTick = xLastWakeTime;
+//                sendIsDetected(isDetected);
+//            }
 
             Serial.println("kalman          : " + String(distanceKalman));
             Serial.println("raw             : " + String(distanceRaw));
             Serial.println("detection_count : " + String(detection_count));
-
         }
     }
     else {
